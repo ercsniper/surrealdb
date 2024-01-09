@@ -5708,7 +5708,7 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "rustyline",
- "semver",
+ "semver 1.0.20",
  "serde",
  "serde_json",
  "serial_test",
