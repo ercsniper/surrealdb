@@ -3,7 +3,6 @@ use crate::sql::value::Value;
 use serde::ser::SerializeStruct;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::{self, Display, Formatter};
 use std::time::Duration;
 
 pub(crate) const TOKEN: &str = "$surrealdb::private::sql::Response";

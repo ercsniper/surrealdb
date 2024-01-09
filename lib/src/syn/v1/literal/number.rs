@@ -1,4 +1,5 @@
 use super::super::{ending::number as ending, IResult, ParseError};
+use crate::sql::number::I256;
 use crate::sql::Number;
 use nom::{
 	branch::alt,
@@ -9,7 +10,6 @@ use nom::{
 	Err,
 };
 use rust_decimal::Decimal;
-use crate::sql::number::I256;
 use std::str::FromStr;
 
 fn not_nan(i: &str) -> IResult<&str, Number> {
@@ -79,18 +79,15 @@ enum Suffix {
 	None,
 	Float,
 	Decimal,
-	BigInt
+	BigInt,
 }
 
 fn suffix(i: &str) -> IResult<&str, Suffix> {
-	let (i, opt_suffix) =
-		opt(alt(
-			(
-				value(Suffix::Float, tag("f")), 
-				value(Suffix::Decimal, tag("dec")),
-				value(Suffix::BigInt, tag("bigint")),
-			)
-		))(i)?;
+	let (i, opt_suffix) = opt(alt((
+		value(Suffix::Float, tag("f")),
+		value(Suffix::Decimal, tag("dec")),
+		value(Suffix::BigInt, tag("bigint")),
+	)))(i)?;
 	Ok((i, opt_suffix.unwrap_or(Suffix::None)))
 }
 

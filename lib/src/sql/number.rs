@@ -405,7 +405,6 @@ impl Number {
 		}
 	}
 
-
 	// -----------------------------------
 	//
 	// -----------------------------------
@@ -605,7 +604,8 @@ macro_rules! impl_simple_try_op {
 						v.$checked(w).ok_or_else(|| Error::$trt(v.to_string(), w.to_string()))?,
 					),
 					(Number::BigInt(v), w) => Number::BigInt(
-						v.$checked(w.to_bigint()).ok_or_else(|| Error::$trt(v.to_string(), w.to_string()))?,
+						v.$checked(w.to_bigint())
+							.ok_or_else(|| Error::$trt(v.to_string(), w.to_string()))?,
 					),
 					(v, w) => Number::Decimal(
 						v.to_decimal()

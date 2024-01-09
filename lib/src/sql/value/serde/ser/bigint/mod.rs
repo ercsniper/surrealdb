@@ -2,21 +2,16 @@ use crate::err::Error;
 use crate::sql::value::serde::ser;
 use revision::Error as RevisionError;
 use revision::Revisioned;
+use rust_decimal::prelude::*;
+use serde::de::{self, Visitor};
 use serde::ser::Error as _;
 use serde::ser::Impossible;
-use serde::{
-	Deserialize, 
-	Serialize, 
-	Deserializer, 
-	Serializer as SerdeSerializer, 
-};
-use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer as SerdeSerializer};
 use std::fmt::{Display, Formatter};
 use std::iter::Product;
 use std::iter::Sum;
 use std::ops::{Add, Div, Mul, Neg, Rem, Sub};
 use std::str::FromStr;
-use rust_decimal::prelude::*;
 
 pub(super) struct Serializer;
 
@@ -35,7 +30,7 @@ impl Serialize for I256 {
 	}
 }
 
-impl <'de> Deserialize<'de> for I256 {
+impl<'de> Deserialize<'de> for I256 {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: Deserializer<'de>,
@@ -48,14 +43,14 @@ struct I256Visitor;
 
 impl<'de> Visitor<'de> for I256Visitor {
 	type Value = I256;
-	
+
 	fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
 		formatter.write_str("I256")
 	}
 
 	fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
 	where
-		E: de::Error
+		E: de::Error,
 	{
 		match alloy_primitives::I256::from_str(v) {
 			Ok(v) => Ok(I256(v)),
@@ -85,19 +80,19 @@ impl From<alloy_primitives::I256> for I256 {
 }
 
 impl From<usize> for I256 {
-	fn from(v: usize)-> Self {
+	fn from(v: usize) -> Self {
 		Self(alloy_primitives::I256::from_str(v.to_string().as_str()).unwrap())
 	}
 }
 
 impl From<i128> for I256 {
-	fn from(v: i128)-> Self {
+	fn from(v: i128) -> Self {
 		Self(alloy_primitives::I256::from_str(v.to_string().as_str()).unwrap())
 	}
 }
 
 impl From<u128> for I256 {
-	fn from(v: u128)-> Self {
+	fn from(v: u128) -> Self {
 		Self(alloy_primitives::I256::from_str(v.to_string().as_str()).unwrap())
 	}
 }
@@ -105,7 +100,7 @@ impl From<u128> for I256 {
 impl TryFrom<f64> for I256 {
 	// todo: [zyre] add support for f64
 	type Error = Error;
-	fn try_from(v: f64) ->  Result<Self, Self::Error> {
+	fn try_from(v: f64) -> Result<Self, Self::Error> {
 		Err(Error::TryFrom(v.to_string(), "I256"))
 	}
 }
@@ -113,7 +108,7 @@ impl TryFrom<f64> for I256 {
 impl TryFrom<Decimal> for I256 {
 	// todo: [zyre] properly handle conversions
 	type Error = Error;
-	fn try_from(v: Decimal) ->  Result<Self, Self::Error> {
+	fn try_from(v: Decimal) -> Result<Self, Self::Error> {
 		match v.to_i128() {
 			Some(v) => Ok(I256::from(v)),
 			None => Err(Error::TryFrom(v.to_string(), "I256")),
@@ -124,7 +119,7 @@ impl TryFrom<Decimal> for I256 {
 impl TryFrom<&str> for I256 {
 	// todo: [zyre] properly handle conversions
 	type Error = Error;
-	fn try_from(v: &str) ->  Result<Self, Self::Error> {
+	fn try_from(v: &str) -> Result<Self, Self::Error> {
 		info!("TryFrom<&str> I256: {}", v);
 		match I256::from_str(v) {
 			Ok(v) => Ok(v),
@@ -136,7 +131,7 @@ impl TryFrom<&str> for I256 {
 impl TryFrom<String> for I256 {
 	// todo: [zyre] properly handle conversions
 	type Error = Error;
-	fn try_from(v: String) ->  Result<Self, Self::Error> {
+	fn try_from(v: String) -> Result<Self, Self::Error> {
 		info!("TryFrom<String> I256: {}", v);
 		match I256::from_str(v.as_str()) {
 			Ok(v) => Ok(v),
@@ -145,11 +140,9 @@ impl TryFrom<String> for I256 {
 	}
 }
 
-
 impl TryFrom<&[u8]> for I256 {
 	type Error = Error;
-	fn try_from(v: &[u8]) ->  Result<Self, Self::Error> {
-		
+	fn try_from(v: &[u8]) -> Result<Self, Self::Error> {
 		let s = String::from_utf8_lossy(v);
 		info!("TryFrom<&[u8]> I256: {}", s);
 		match I256::from_str(s.as_ref()) {
@@ -158,7 +151,6 @@ impl TryFrom<&[u8]> for I256 {
 		}
 	}
 }
-
 
 impl I256 {
 	// Satisfy `try_into_prim` macro
@@ -261,10 +253,10 @@ impl I256 {
 	pub fn zero() -> Self {
 		I256(alloy_primitives::I256::ZERO)
 	}
-  #[inline]
-  pub fn one() -> Self {
-    I256(alloy_primitives::I256::ONE)
-  }
+	#[inline]
+	pub fn one() -> Self {
+		I256(alloy_primitives::I256::ONE)
+	}
 
 	// checked arithmetic
 	pub fn checked_add(self, rhs: Self) -> Option<Self> {
@@ -304,7 +296,7 @@ impl Add<Self> for I256 {
 	}
 }
 
-impl <'a, 'b> Add<&'b I256> for &'a I256 {
+impl<'a, 'b> Add<&'b I256> for &'a I256 {
 	type Output = I256;
 	#[inline]
 	fn add(self, rhs: &'b I256) -> I256 {
@@ -320,7 +312,7 @@ impl Sub<Self> for I256 {
 	}
 }
 
-impl <'a, 'b> Sub<&'b I256> for &'a I256 {
+impl<'a, 'b> Sub<&'b I256> for &'a I256 {
 	type Output = I256;
 	#[inline]
 	fn sub(self, rhs: &'b I256) -> I256 {
@@ -336,7 +328,7 @@ impl Mul<Self> for I256 {
 	}
 }
 
-impl <'a, 'b> Mul<&'b I256> for &'a I256 {
+impl<'a, 'b> Mul<&'b I256> for &'a I256 {
 	type Output = I256;
 	#[inline]
 	fn mul(self, rhs: &'b I256) -> I256 {
@@ -352,7 +344,7 @@ impl Div<Self> for I256 {
 	}
 }
 
-impl <'a, 'b> Div<&'b I256> for &'a I256 {
+impl<'a, 'b> Div<&'b I256> for &'a I256 {
 	type Output = I256;
 	#[inline]
 	fn div(self, rhs: &'b I256) -> I256 {
@@ -362,7 +354,7 @@ impl <'a, 'b> Div<&'b I256> for &'a I256 {
 
 impl Rem<Self> for I256 {
 	type Output = Self;
-  #[inline]
+	#[inline]
 	fn rem(self, rhs: Self) -> Self {
 		self.0.rem(rhs.0).into()
 	}
@@ -377,7 +369,7 @@ impl Sum<Self> for I256 {
 	}
 }
 
-impl <'a> Sum<&'a Self> for I256 {
+impl<'a> Sum<&'a Self> for I256 {
 	fn sum<I>(iter: I) -> I256
 	where
 		I: Iterator<Item = &'a Self>,
@@ -395,7 +387,7 @@ impl Product<Self> for I256 {
 	}
 }
 
-impl <'a> Product<&'a Self> for I256 {
+impl<'a> Product<&'a Self> for I256 {
 	fn product<I>(iter: I) -> I256
 	where
 		I: Iterator<Item = &'a Self>,
@@ -412,10 +404,10 @@ impl Display for I256 {
 
 fn unsafe_u64_to_u8_slice(slice: &[u64]) -> &[u8] {
 	unsafe {
-			std::slice::from_raw_parts(
-					slice.as_ptr() as *const u8,
-					slice.len() * std::mem::size_of::<u64>(),
-			)
+		std::slice::from_raw_parts(
+			slice.as_ptr() as *const u8,
+			std::mem::size_of_val(slice),
+		)
 	}
 }
 
@@ -438,14 +430,12 @@ impl Revisioned for I256 {
 	fn serialize_revisioned<W: std::io::Write>(&self, w: &mut W) -> Result<(), RevisionError> {
 		let limbs = self.0.as_limbs();
 		let bytes = unsafe_u64_to_u8_slice(limbs);
-		w.write_all(bytes)
-		.map_err(|e| RevisionError::Io(e.raw_os_error().unwrap_or(0)))
+		w.write_all(bytes).map_err(|e| RevisionError::Io(e.raw_os_error().unwrap_or(0)))
 	}
 	#[inline]
 	fn deserialize_revisioned<R: std::io::Read>(r: &mut R) -> Result<Self, RevisionError> {
 		let mut v = [0u8; 32];
-		r
-			.read_exact(v.as_mut_slice())
+		r.read_exact(v.as_mut_slice())
 			.map_err(|e| RevisionError::Io(e.raw_os_error().unwrap_or(0)))?;
 		Ok(I256(alloy_primitives::I256::from_le_bytes(v)))
 	}
