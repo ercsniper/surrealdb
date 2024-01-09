@@ -134,6 +134,7 @@ pub fn thing((arg1, arg2): (Value, Option<Value>)) -> Result<Value, Error> {
 
 pub mod is {
 	use crate::err::Error;
+	use crate::sql::table::Table;
 	use crate::sql::value::Value;
 	use crate::sql::Geometry;
 
@@ -223,7 +224,7 @@ pub mod is {
 
 	pub fn record((arg, table): (Value, Option<String>)) -> Result<Value, Error> {
 		Ok(match table {
-			Some(tb) => arg.is_record_of_table(tb).into(),
+			Some(tb) => arg.is_record_type(&[Table(tb)]).into(),
 			None => arg.is_record().into(),
 		})
 	}
