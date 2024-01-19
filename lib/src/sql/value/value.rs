@@ -5,7 +5,7 @@ use crate::dbs::{Options, Transaction};
 use crate::doc::CursorDoc;
 use crate::err::Error;
 use crate::fnc::util::string::fuzzy::Fuzzy;
-use crate::sql::value::serde::I256;
+use crate::sql::value::serde::BiggerInt;
 use crate::sql::{
 	array::Uniq,
 	fmt::{Fmt, Pretty},
@@ -369,8 +369,8 @@ impl From<Decimal> for Value {
 	}
 }
 
-impl From<I256> for Value {
-	fn from(v: I256) -> Self {
+impl From<BiggerInt> for Value {
+	fn from(v: BiggerInt) -> Self {
 		Value::Number(Number::from(v))
 	}
 }
@@ -659,12 +659,12 @@ impl TryFrom<Value> for Decimal {
 	}
 }
 
-impl TryFrom<Value> for I256 {
+impl TryFrom<Value> for BiggerInt {
 	type Error = Error;
 	fn try_from(value: Value) -> Result<Self, Self::Error> {
 		match value {
 			Value::Number(x) => x.try_into(),
-			_ => Err(Error::TryFrom(value.to_string(), "I256")),
+			_ => Err(Error::TryFrom(value.to_string(), "BiggerInt")),
 		}
 	}
 }
@@ -1457,10 +1457,10 @@ impl Value {
 			// Allow any big number
 			Value::Number(v) if v.is_bigint() => Ok(v),
 			// Attempt to convert an int number
-			Value::Number(Number::Int(v)) => Ok(Number::BigInt(I256::from(v))),
+			Value::Number(Number::Int(v)) => Ok(Number::BigInt(BiggerInt::from(v))),
 			// Attempt to convert an decimal number
 			Value::Number(Number::Decimal(v)) => match v.to_i128() {
-				Some(v) => Ok(Number::BigInt(I256::from(v))),
+				Some(v) => Ok(Number::BigInt(BiggerInt::from(v))),
 				None => Err(Error::CoerceTo {
 					from: self,
 					into: "bigint".into(),
@@ -2013,7 +2013,7 @@ impl Value {
 			// Allow any big number
 			Value::Number(v) if v.is_bigint() => Ok(v),
 			// Attempt to convert an int number
-			Value::Number(Number::Int(ref v)) => match I256::try_from(*v) {
+			Value::Number(Number::Int(ref v)) => match BiggerInt::try_from(*v) {
 				// The Int can be represented as a Big
 				Ok(v) => Ok(Number::BigInt(v)),
 				// This Int does not convert to a Big
@@ -2023,7 +2023,7 @@ impl Value {
 				}),
 			},
 			// Attempt to convert an float number
-			Value::Number(Number::Float(ref v)) => match I256::try_from(*v) {
+			Value::Number(Number::Float(ref v)) => match BiggerInt::try_from(*v) {
 				// The Float can be represented as a Big
 				Ok(v) => Ok(Number::BigInt(v)),
 				// This Float does not convert to a Big
@@ -2033,7 +2033,7 @@ impl Value {
 				}),
 			},
 			// Attempt to convert a decimal number
-			Value::Number(Number::Decimal(ref v)) => match I256::try_from(*v) {
+			Value::Number(Number::Decimal(ref v)) => match BiggerInt::try_from(*v) {
 				// The Float can be represented as a Big
 				Ok(v) => Ok(Number::BigInt(v)),
 				// This Float does not convert to a Big
@@ -2043,7 +2043,7 @@ impl Value {
 				}),
 			},
 			// Attempt to convert a string value
-			Value::Strand(ref v) => match I256::from_str(v) {
+			Value::Strand(ref v) => match BiggerInt::from_str(v) {
 				// The string can be represented as a Big
 				Ok(v) => Ok(Number::BigInt(v)),
 				// This string is not a Big
