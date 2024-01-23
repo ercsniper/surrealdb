@@ -3,6 +3,7 @@ use crate::sql::value::Value;
 use serde::ser::SerializeStruct;
 use serde::Deserialize;
 use serde::Serialize;
+use std::fmt::{self, Display, Formatter};
 use std::time::Duration;
 
 pub(crate) const TOKEN: &str = "$surrealdb::private::sql::Response";
@@ -63,5 +64,34 @@ impl Serialize for Response {
 			}
 		}
 		val.end()
+	}
+}
+
+// User facing response sent to WS and HTTP connections directly
+#[derive(Serialize)]
+pub struct ApiResponse {
+	time: String,
+	status: Status,
+	result: Value,
+}
+
+impl From<Response> for ApiResponse {
+	fn from(r: Response) -> Self {
+		let time = r.speed();
+		let (status, result) = match r.result {
+			Ok(value) => (Status::Ok, value),
+			Err(error) => (Status::Err, error.to_string().into()),
+		};
+		Self {
+			time,
+			status,
+			result,
+		}
+	}
+}
+
+impl Display for ApiResponse {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", serde_json::to_string(self).unwrap())
 	}
 }
