@@ -1,5 +1,5 @@
 pub use super::value::serde::BiggerInt;
-use super::value::{TryAdd, TryDiv, TryMul, TryNeg, TryPow, TryRem, TrySub};
+use super::value::{TryAdd, TryDiv, TryMul, TryNeg, TryPow, TrySub};
 use crate::err::Error;
 use crate::sql::strand::Strand;
 use revision::revisioned;
@@ -786,7 +786,6 @@ impl<'a, 'b> ops::Sub<&'b Number> for &'a Number {
 impl ops::Mul for Number {
 	type Output = Self;
 	fn mul(self, other: Self) -> Self {
-		info!("Multiplying {} * {}", self, other);
 		match (self, other) {
 			(Number::Int(v), Number::Int(w)) => Number::Int(v * w),
 			(Number::Float(v), Number::Float(w)) => Number::Float(v * w),
@@ -812,7 +811,6 @@ impl ops::Mul for Number {
 impl<'a, 'b> ops::Mul<&'b Number> for &'a Number {
 	type Output = Number;
 	fn mul(self, other: &'b Number) -> Number {
-		info!("Multiplying {} * {}", self, other);
 		match (self, other) {
 			(Number::Int(v), Number::Int(w)) => Number::Int(v * w),
 			(Number::Float(v), Number::Float(w)) => Number::Float(v * w),
@@ -922,7 +920,6 @@ impl Product<Self> for Number {
 	where
 		I: Iterator<Item = Self>,
 	{
-		info!("Calculating product");
 		iter.fold(Number::Int(1), |a, b| a * b)
 	}
 }
@@ -932,7 +929,6 @@ impl<'a> Product<&'a Self> for Number {
 	where
 		I: Iterator<Item = &'a Self>,
 	{
-		info!("Calculating product");
 		iter.fold(Number::Int(1), |a, b| &a * b)
 	}
 }

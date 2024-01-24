@@ -120,7 +120,6 @@ impl TryFrom<&str> for I256 {
 	// todo: [zyre] properly handle conversions
 	type Error = Error;
 	fn try_from(v: &str) -> Result<Self, Self::Error> {
-		info!("TryFrom<&str> I256: {}", v);
 		match I256::from_str(v) {
 			Ok(v) => Ok(v),
 			Err(_) => Err(Error::TryFrom(v.to_string(), "I256")),
@@ -132,7 +131,6 @@ impl TryFrom<String> for I256 {
 	// todo: [zyre] properly handle conversions
 	type Error = Error;
 	fn try_from(v: String) -> Result<Self, Self::Error> {
-		info!("TryFrom<String> I256: {}", v);
 		match I256::from_str(v.as_str()) {
 			Ok(v) => Ok(v),
 			Err(_) => Err(Error::TryFrom(v.to_string(), "I256")),
@@ -144,7 +142,6 @@ impl TryFrom<&[u8]> for I256 {
 	type Error = Error;
 	fn try_from(v: &[u8]) -> Result<Self, Self::Error> {
 		let s = String::from_utf8_lossy(v);
-		info!("TryFrom<&[u8]> I256: {}", s);
 		match I256::from_str(s.as_ref()) {
 			Ok(v) => Ok(v),
 			Err(_) => Err(Error::TryFrom(s.to_string(), "I256")),

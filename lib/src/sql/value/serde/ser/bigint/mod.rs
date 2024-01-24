@@ -1,6 +1,6 @@
 use crate::err::Error;
 use crate::sql::value::serde::ser;
-use bnum::types::{I512};
+use bnum::types::I512;
 use revision::Error as RevisionError;
 use revision::Revisioned;
 use rust_decimal::prelude::*;
@@ -99,7 +99,6 @@ impl From<u128> for BiggerInt {
 }
 
 impl TryFrom<f64> for BiggerInt {
-	// todo: [zyre] add support for f64
 	type Error = Error;
 	fn try_from(v: f64) -> Result<Self, Self::Error> {
 		Err(Error::TryFrom(v.to_string(), "BiggerInt"))
@@ -107,7 +106,6 @@ impl TryFrom<f64> for BiggerInt {
 }
 
 impl TryFrom<Decimal> for BiggerInt {
-	// todo: [zyre] properly handle conversions
 	type Error = Error;
 	fn try_from(v: Decimal) -> Result<Self, Self::Error> {
 		match v.to_i128() {
@@ -118,10 +116,8 @@ impl TryFrom<Decimal> for BiggerInt {
 }
 
 impl TryFrom<&str> for BiggerInt {
-	// todo: [zyre] properly handle conversions
 	type Error = Error;
 	fn try_from(v: &str) -> Result<Self, Self::Error> {
-		info!("TryFrom<&str> BiggerInt: {}", v);
 		match BiggerInt::from_str(v) {
 			Ok(v) => Ok(v),
 			Err(_) => Err(Error::TryFrom(v.to_string(), "BiggerInt")),
@@ -130,10 +126,8 @@ impl TryFrom<&str> for BiggerInt {
 }
 
 impl TryFrom<String> for BiggerInt {
-	// todo: [zyre] properly handle conversions
 	type Error = Error;
 	fn try_from(v: String) -> Result<Self, Self::Error> {
-		info!("TryFrom<String> BiggerInt: {}", v);
 		match BiggerInt::from_str(v.as_str()) {
 			Ok(v) => Ok(v),
 			Err(_) => Err(Error::TryFrom(v.to_string(), "BiggerInt")),
@@ -145,7 +139,6 @@ impl TryFrom<&[u8]> for BiggerInt {
 	type Error = Error;
 	fn try_from(v: &[u8]) -> Result<Self, Self::Error> {
 		let s = String::from_utf8_lossy(v);
-		info!("TryFrom<&[u8]> BiggerInt: {}", s);
 		match BiggerInt::from_str(s.as_ref()) {
 			Ok(v) => Ok(v),
 			Err(_) => Err(Error::TryFrom(s.to_string(), "BiggerInt")),
@@ -291,14 +284,7 @@ impl BiggerInt {
 	}
 
 	pub fn from_str(s: &str) -> Result<Self, bnum::errors::ParseIntError> {
-		let mut sval = s;
-		if sval.starts_with('-') {
-			sval = &sval[3..];
-		} else {
-			sval = &sval[2..];
-		}
-		let v = I512::from_str_radix(sval, 16)?;
-		Ok(BiggerInt(v))
+		Ok(BiggerInt(I512::from_str_radix(s.replace("0x", "").as_str(), 16)?))
 	}
 
 	// Forward arithmetic operations
@@ -509,9 +495,8 @@ impl Revisioned for BiggerInt {
 	#[inline]
 	fn deserialize_revisioned<R: std::io::Read>(r: &mut R) -> Result<Self, RevisionError> {
 		let mut v = [0u8; 64];
-		
-		r.read_exact(v.as_mut_slice())
-			.map_err(|e| RevisionError::Io(e.raw_os_error().unwrap()))?;
+
+		r.read_exact(v.as_mut_slice()).map_err(|e| RevisionError::Io(e.raw_os_error().unwrap()))?;
 		Ok(BiggerInt(I512::from_le_slice(&v).unwrap_or(I512::ZERO)))
 	}
 }
