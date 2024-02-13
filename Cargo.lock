@@ -4269,7 +4269,7 @@ checksum = "31b476131c3c86cb68032fdc5cb6d5a1045e3e42d96b69fa599fd77701e1f5bf"
 dependencies = [
  "bit-set",
  "bit-vec",
- "bitflags 2.4.1",
+ "bitflags 2.4.2",
  "lazy_static",
  "num-traits",
  "rand 0.8.5",
@@ -5705,7 +5705,7 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "rustyline",
- "semver",
+ "semver 1.0.20",
  "serde",
  "serde_json",
  "serial_test",
@@ -5734,7 +5734,14 @@ dependencies = [
 name = "surrealdb"
 version = "1.2.0"
 dependencies = [
+ "addr",
+ "alloy-primitives",
+ "any_ascii",
+ "argon2",
  "async-channel",
+ "async-recursion 1.0.5",
+ "base64 0.21.7",
+ "bcrypt",
  "bincode",
  "chrono",
  "criterion",
@@ -5758,7 +5765,7 @@ dependencies = [
  "ring 0.17.7",
  "rust_decimal",
  "rustls",
- "semver",
+ "semver 1.0.20",
  "serde",
  "serde_json",
  "serial_test",
@@ -5787,7 +5794,6 @@ name = "surrealdb-core"
 version = "1.2.0"
 dependencies = [
  "addr",
- "alloy-primitives",
  "any_ascii",
  "arbitrary",
  "argon2",
@@ -7329,7 +7335,7 @@ checksum = "ce36e65b0d2999d2aafac989fb249189a141aee1f53c612c1f37d72631959f69"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.39",
+ "syn 2.0.48",
 ]
 
 [[package]]
