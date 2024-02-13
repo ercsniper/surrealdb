@@ -1,5 +1,5 @@
 use super::super::{ending::number as ending, IResult, ParseError};
-use crate::sql::number::I256;
+use crate::sql::number::BiggerInt;
 use crate::sql::Number;
 use nom::{
 	branch::alt,
@@ -59,8 +59,8 @@ fn not_nan(i: &str) -> IResult<&str, Number> {
 				.map_err(Err::Failure)?,
 		),
 		Suffix::BigInt => Number::from(
-			I256::from_str(v)
-				.map_err(|e| ParseError::ParseBigInt {
+			BiggerInt::from_str(v)
+				.map_err(|e| ParseError::ParseBiggerInt {
 					tried: v,
 					error: e,
 				})

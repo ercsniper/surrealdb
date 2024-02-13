@@ -70,7 +70,7 @@ use serde::ser::SerializeTupleStruct;
 use serde::ser::SerializeTupleVariant;
 use std::fmt::Display;
 
-pub use bigint::I256;
+pub use bigint::BiggerInt;
 pub use value::to_value;
 
 trait Serializer: Sized {

@@ -53,6 +53,10 @@ pub enum ParseError<I> {
 		tried: I,
 		error: alloy_primitives::ParseSignedError,
 	},
+	ParseBiggerInt {
+		tried: I,
+		error: bnum::errors::ParseIntError,
+	},
 	ParseRegex {
 		tried: I,
 		error: regex::Error,
@@ -114,6 +118,11 @@ impl<I: Clone> ParseError<I> {
 			..
 		}
 		| Self::ParseBigInt {
+			ref tried,
+			..
+		}
+		|
+		Self::ParseBiggerInt {
 			ref tried,
 			..
 		}
@@ -358,7 +367,20 @@ impl ParseError<&str> {
 			} => {
 				let location = Location::of_in(tried, input);
 				// Writing to a string can't return an error.
-				let text = format!("Failed to parse '{tried}' as big int: {error}.");
+				let text = format!("Failed to parse '{tried}' as big int (256 bits): {error}.");
+				let snippet = Snippet::from_source_location(input, location, None);
+				RenderedError {
+					text,
+					snippets: vec![snippet],
+				}
+			}
+			ParseError::ParseBiggerInt {
+				tried,
+				error,
+			} => {
+				let location = Location::of_in(tried, input);
+				// Writing to a string can't return an error.
+				let text = format!("Failed to parse '{tried}' as big int (512 bits): {error}.");
 				let snippet = Snippet::from_source_location(input, location, None);
 				RenderedError {
 					text,
