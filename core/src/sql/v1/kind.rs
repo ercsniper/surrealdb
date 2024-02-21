@@ -55,6 +55,7 @@ impl Kind {
 				| Kind::Bytes
 				| Kind::Datetime
 				| Kind::Decimal
+				| Kind::BigInt
 				| Kind::Duration
 				| Kind::Float
 				| Kind::Int

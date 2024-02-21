@@ -1,6 +1,6 @@
 mod algorithm;
 mod base;
-mod bigint;
+mod big;
 mod block;
 mod cast;
 mod changefeed;
@@ -70,7 +70,7 @@ use serde::ser::SerializeTupleStruct;
 use serde::ser::SerializeTupleVariant;
 use std::fmt::Display;
 
-pub use bigint::BiggerInt;
+pub use big::BiggerInt;
 pub use value::to_value;
 
 trait Serializer: Sized {

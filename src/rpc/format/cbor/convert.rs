@@ -14,6 +14,7 @@ const TAG_UUID: u64 = 7;
 const TAG_DECIMAL: u64 = 8;
 const TAG_DURATION: u64 = 9;
 const TAG_RECORDID: u64 = 10;
+const TAG_BIGINT: u64 = 11;
 
 #[derive(Debug)]
 pub struct Cbor(pub Data);
@@ -113,6 +114,14 @@ impl TryFrom<Cbor> for Value {
 						},
 						_ => Err("Expected a CBOR text data type, or a CBOR array with 2 elements"),
 					},
+					TAG_BIGINT => match *v {
+						Data::Text(v) => match Number::try_from(v) {
+							// todo: [zyre] check implementation
+							Ok(v) => Ok(v.into()),
+							_ => Err("Expected a valid BigInt value"),
+						}
+						_ => Err("Expected a CBOR text data type"),
+					}
 					// An unknown tag
 					_ => Err("Encountered an unknown CBOR tag"),
 				}
@@ -134,6 +143,9 @@ impl TryFrom<Value> for Cbor {
 				Number::Float(v) => Ok(Cbor(Data::Float(v))),
 				Number::Decimal(v) => {
 					Ok(Cbor(Data::Tag(TAG_DECIMAL, Box::new(Data::Text(v.to_string())))))
+				}
+				Number::BigInt(v) => {
+					Ok(Cbor(Data::Tag(TAG_BIGINT, Box::new(Data::Text(v.to_string())))))
 				}
 			},
 			Value::Strand(v) => Ok(Cbor(Data::Text(v.0))),

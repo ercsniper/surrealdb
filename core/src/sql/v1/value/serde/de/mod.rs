@@ -223,6 +223,7 @@ fn into_json(value: Value, simplify: bool) -> JsonValue {
 			Number::Int(int) => int.into(),
 			Number::Float(float) => float.into(),
 			Number::Decimal(decimal) => json!(decimal),
+			Number::BigInt(bigint) => json!(bigint),
 		},
 		Value::Strand(strand) => strand.0.into(),
 		Value::Duration(duration) => match simplify {

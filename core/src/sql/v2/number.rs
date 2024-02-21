@@ -11,6 +11,7 @@ use std::iter::Product;
 use std::iter::Sum;
 use std::ops::{self, Add, Div, Mul, Neg, Rem, Sub};
 use std::str::FromStr;
+use super::value::serde::BiggerInt;
 
 pub(crate) const TOKEN: &str = "$surrealdb::private::sql::Number";
 
@@ -23,6 +24,7 @@ pub enum Number {
 	Float(f64),
 	Decimal(Decimal),
 	// Add new variants here
+	BigInt(BiggerInt),
 }
 
 impl Default for Number {
