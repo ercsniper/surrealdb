@@ -13,6 +13,7 @@ pub enum Kind {
 	Bytes,
 	Datetime,
 	Decimal,
+	BigInt,
 	Duration,
 	Float,
 	Int,
@@ -54,6 +55,7 @@ impl Kind {
 				| Kind::Bytes
 				| Kind::Datetime
 				| Kind::Decimal
+				| Kind::BigInt
 				| Kind::Duration
 				| Kind::Float
 				| Kind::Int
@@ -101,6 +103,7 @@ impl Display for Kind {
 			Kind::Duration => f.write_str("duration"),
 			Kind::Float => f.write_str("float"),
 			Kind::Int => f.write_str("int"),
+			Kind::BigInt => f.write_str("bigint"),
 			Kind::Number => f.write_str("number"),
 			Kind::Object => f.write_str("object"),
 			Kind::Point => f.write_str("point"),

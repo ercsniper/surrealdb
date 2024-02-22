@@ -1,3 +1,4 @@
+pub use super::value::BiggerInt;
 use super::value::{TryAdd, TryDiv, TryMul, TryNeg, TryPow, TryRem, TrySub};
 use crate::err::Error;
 use crate::sql::strand::Strand;
@@ -11,7 +12,6 @@ use std::iter::Product;
 use std::iter::Sum;
 use std::ops::{self, Add, Div, Mul, Neg, Rem, Sub};
 use std::str::FromStr;
-use super::value::serde::BiggerInt;
 
 pub(crate) const TOKEN: &str = "$surrealdb::private::sql::Number";
 
@@ -65,6 +65,12 @@ impl From<Decimal> for Number {
 	}
 }
 
+impl From<BiggerInt> for Number {
+	fn from(v: BiggerInt) -> Self {
+		Self::BigInt(v)
+	}
+}
+
 impl FromStr for Number {
 	type Err = ();
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -98,7 +104,10 @@ impl TryFrom<&str> for Number {
 				// Store it as a float
 				Ok(v) => Ok(Self::Float(v)),
 				// It wasn't parsed as a number
-				_ => Err(()),
+				_ => match BiggerInt::from_str(v) {
+					Ok(v) => Ok(Self::BigInt(v)),
+					_ => Err(()),
+				},
 			},
 		}
 	}
@@ -121,6 +130,10 @@ macro_rules! try_into_prim {
 							None => Err(Error::TryFrom(value.to_string(), stringify!($int))),
 						},
 						Number::Decimal(ref v) => match v.$to_int() {
+							Some(v) => Ok(v),
+							None => Err(Error::TryFrom(value.to_string(), stringify!($int))),
+						},
+						Number::BigInt(v) => match v.$to_int() {
 							Some(v) => Ok(v),
 							None => Err(Error::TryFrom(value.to_string(), stringify!($int))),
 						},
@@ -150,6 +163,28 @@ impl TryFrom<Number> for Decimal {
 				_ => Err(Error::TryFrom(value.to_string(), "Decimal")),
 			},
 			Number::Decimal(x) => Ok(x),
+			Number::BigInt(x) => match Decimal::try_from(x.to_i128().unwrap_or_default()) {
+				Ok(x) => Ok(x),
+				_ => Err(Error::TryFrom(value.to_string(), "Decimal")),
+			},
+		}
+	}
+}
+
+impl TryFrom<Number> for BiggerInt {
+	type Error = Error;
+	fn try_from(value: Number) -> Result<Self, Self::Error> {
+		match value {
+			Number::Int(v) => Ok(BiggerInt::from(v)),
+			Number::Float(v) => match BiggerInt::try_from(v) {
+				Ok(v) => Ok(v),
+				Err(e) => Err(e),
+			},
+			Number::Decimal(x) => match BiggerInt::try_from(x.to_i128().unwrap_or_default()) {
+				Ok(x) => Ok(x),
+				_ => Err(Error::TryFrom(value.to_string(), "BiggerInt")),
+			},
+			Number::BigInt(x) => Ok(x),
 		}
 	}
 }
@@ -168,6 +203,8 @@ impl Display for Number {
 				}
 			}
 			Number::Decimal(v) => write!(f, "{v}dec"),
+			// todo: convert to hex
+			Number::BigInt(v) => write!(f, "{v}bigint"),
 		}
 	}
 }
@@ -199,11 +236,16 @@ impl Number {
 		matches!(self, Number::Decimal(_))
 	}
 
+	pub fn is_bigint(&self) -> bool {
+		matches!(self, Number::BigInt(_))
+	}
+
 	pub fn is_integer(&self) -> bool {
 		match self {
 			Number::Int(_) => true,
 			Number::Float(v) => v.fract() == 0.0,
 			Number::Decimal(v) => v.is_integer(),
+			Number::BigInt(_) => true,
 		}
 	}
 
@@ -212,6 +254,7 @@ impl Number {
 			Number::Int(v) => v != &0,
 			Number::Float(v) => v != &0.0,
 			Number::Decimal(v) => v != &Decimal::ZERO,
+			Number::BigInt(v) => v.is_zero(),
 		}
 	}
 
@@ -220,6 +263,7 @@ impl Number {
 			Number::Int(v) => v > &0,
 			Number::Float(v) => v > &0.0,
 			Number::Decimal(v) => v > &Decimal::ZERO,
+			Number::BigInt(v) => v.is_positive(),
 		}
 	}
 
@@ -228,6 +272,7 @@ impl Number {
 			Number::Int(v) => v < &0,
 			Number::Float(v) => v < &0.0,
 			Number::Decimal(v) => v < &Decimal::ZERO,
+			Number::BigInt(v) => v.is_negative(),
 		}
 	}
 
@@ -236,6 +281,7 @@ impl Number {
 			Number::Int(v) => v == &0,
 			Number::Float(v) => v == &0.0,
 			Number::Decimal(v) => v == &Decimal::ZERO,
+			Number::BigInt(v) => v.is_zero(),
 		}
 	}
 
@@ -244,6 +290,7 @@ impl Number {
 			Number::Int(v) => v >= &0,
 			Number::Float(v) => v >= &0.0,
 			Number::Decimal(v) => v >= &Decimal::ZERO,
+			Number::BigInt(v) => v.is_zero_or_positive(),
 		}
 	}
 
@@ -252,6 +299,7 @@ impl Number {
 			Number::Int(v) => v <= &0,
 			Number::Float(v) => v <= &0.0,
 			Number::Decimal(v) => v <= &Decimal::ZERO,
+			Number::BigInt(v) => v.is_zero_or_negative(),
 		}
 	}
 
@@ -264,6 +312,7 @@ impl Number {
 			Number::Int(v) => v as usize,
 			Number::Float(v) => v as usize,
 			Number::Decimal(v) => v.try_into().unwrap_or_default(),
+			Number::BigInt(v) => v.to_usize().unwrap_or_default(),
 		}
 	}
 
@@ -272,6 +321,7 @@ impl Number {
 			Number::Int(v) => v,
 			Number::Float(v) => v as i64,
 			Number::Decimal(v) => v.try_into().unwrap_or_default(),
+			Number::BigInt(v) => v.to_i64().unwrap_or_default(),
 		}
 	}
 
@@ -280,6 +330,7 @@ impl Number {
 			Number::Int(v) => v as f64,
 			Number::Float(v) => v,
 			Number::Decimal(v) => v.try_into().unwrap_or_default(),
+			Number::BigInt(v) => v.to_f64().unwrap_or_default(),
 		}
 	}
 
@@ -288,6 +339,16 @@ impl Number {
 			Number::Int(v) => Decimal::from(v),
 			Number::Float(v) => Decimal::try_from(v).unwrap_or_default(),
 			Number::Decimal(v) => v,
+			Number::BigInt(v) => Decimal::try_from(v.to_i128().unwrap()).unwrap_or_default(),
+		}
+	}
+
+	pub fn as_big(self) -> BiggerInt {
+		match self {
+			Number::Int(v) => BiggerInt::from(v),
+			Number::Float(v) => BiggerInt::try_from(v as i64).unwrap_or_default(),
+			Number::Decimal(v) => BiggerInt::from(v.to_i128().unwrap_or_default()),
+			Number::BigInt(v) => v,
 		}
 	}
 
@@ -300,6 +361,7 @@ impl Number {
 			Number::Int(v) => *v as usize,
 			Number::Float(v) => *v as usize,
 			Number::Decimal(v) => v.to_usize().unwrap_or_default(),
+			Number::BigInt(v) => v.to_usize().unwrap_or_default(),
 		}
 	}
 
@@ -308,6 +370,7 @@ impl Number {
 			Number::Int(v) => *v,
 			Number::Float(v) => *v as i64,
 			Number::Decimal(v) => v.to_i64().unwrap_or_default(),
+			Number::BigInt(v) => v.to_i64().unwrap_or_default(),
 		}
 	}
 
@@ -316,6 +379,7 @@ impl Number {
 			Number::Int(v) => *v as f64,
 			Number::Float(v) => *v,
 			&Number::Decimal(v) => v.try_into().unwrap_or_default(),
+			Number::BigInt(v) => v.to_f64().unwrap_or_default(),
 		}
 	}
 
@@ -327,6 +391,18 @@ impl Number {
 			Number::Int(v) => Decimal::try_from(*v).unwrap_or_default(),
 			Number::Float(v) => Decimal::try_from(*v).unwrap_or_default(),
 			Number::Decimal(v) => *v,
+			Number::BigInt(v) => {
+				Decimal::try_from(v.to_u128().unwrap_or_default()).unwrap_or_default()
+			}
+		}
+	}
+
+	pub fn to_bigint(&self) -> BiggerInt {
+		match self {
+			Number::Int(v) => BiggerInt::try_from(*v).unwrap_or_default(),
+			Number::Float(v) => BiggerInt::try_from(*v).unwrap_or_default(),
+			Number::Decimal(v) => BiggerInt::try_from(v.to_string()).unwrap_or_default(),
+			Number::BigInt(v) => *v,
 		}
 	}
 
@@ -339,6 +415,7 @@ impl Number {
 			Number::Int(v) => v.abs().into(),
 			Number::Float(v) => v.abs().into(),
 			Number::Decimal(v) => v.abs().into(),
+			Number::BigInt(v) => v.abs().into(),
 		}
 	}
 
@@ -351,6 +428,7 @@ impl Number {
 			Number::Int(v) => v.into(),
 			Number::Float(v) => v.ceil().into(),
 			Number::Decimal(v) => v.ceil().into(),
+			Number::BigInt(v) => v.into(),
 		}
 	}
 
@@ -359,6 +437,7 @@ impl Number {
 			Number::Int(v) => v.into(),
 			Number::Float(v) => v.floor().into(),
 			Number::Decimal(v) => v.floor().into(),
+			Number::BigInt(v) => v.into(),
 		}
 	}
 
@@ -367,6 +446,7 @@ impl Number {
 			Number::Int(v) => v.into(),
 			Number::Float(v) => v.round().into(),
 			Number::Decimal(v) => v.round().into(),
+			Number::BigInt(v) => v.into(),
 		}
 	}
 
@@ -375,6 +455,7 @@ impl Number {
 			Number::Int(v) => format!("{v:.precision$}").try_into().unwrap_or_default(),
 			Number::Float(v) => format!("{v:.precision$}").try_into().unwrap_or_default(),
 			Number::Decimal(v) => v.round_dp(precision as u32).into(),
+			Number::BigInt(v) => format!("{v:.precision$}").try_into().unwrap_or_default(),
 		}
 	}
 
@@ -383,6 +464,7 @@ impl Number {
 			Number::Int(v) => (v as f64).sqrt().into(),
 			Number::Float(v) => v.sqrt().into(),
 			Number::Decimal(v) => v.sqrt().unwrap_or_default().into(),
+			Number::BigInt(_) => BiggerInt::zero().into(),
 		}
 	}
 
@@ -392,6 +474,9 @@ impl Number {
 			(Number::Decimal(v), Number::Int(p)) => v.powi(p).into(),
 			// TODO: (Number::Decimal(v), Number::Float(p)) => todo!(),
 			// TODO: (Number::Decimal(v), Number::Decimal(p)) => todo!(),
+			(Number::Int(v), Number::BigInt(p)) => v.pow(p.to_u32().unwrap_or_default()).into(),
+			(Number::BigInt(v), Number::Int(p)) => v.pow(p as u32).into(),
+			(Number::BigInt(v), Number::BigInt(p)) => v.pow(p.to_u32().unwrap_or_default()).into(),
 			(v, p) => v.as_float().powf(p.as_float()).into(),
 		}
 	}
@@ -415,6 +500,7 @@ impl Ord for Number {
 			(Number::Int(v), Number::Int(w)) => v.cmp(w),
 			(Number::Float(v), Number::Float(w)) => total_cmp_f64(*v, *w),
 			(Number::Decimal(v), Number::Decimal(w)) => v.cmp(w),
+			(Number::BigInt(v), Number::BigInt(w)) => v.cmp(*w),
 			// ------------------------------
 			(Number::Int(v), Number::Float(w)) => total_cmp_f64(*v as f64, *w),
 			(Number::Float(v), Number::Int(w)) => total_cmp_f64(*v, *w as f64),
@@ -427,6 +513,19 @@ impl Ord for Number {
 				total_cmp_f64(*v, w.to_f64().unwrap())
 			}
 			(Number::Decimal(v), Number::Float(w)) => total_cmp_f64(v.to_f64().unwrap(), *w),
+			// ------------------------------
+			(Number::BigInt(v), Number::Int(w)) => v.cmp(BiggerInt::from(*w)),
+			(Number::Int(v), Number::BigInt(w)) => BiggerInt::from(*v).cmp(*w),
+			// ------------------------------
+			(Number::BigInt(v), Number::Float(w)) => v.cmp(BiggerInt::from(*w as u64)),
+			(Number::Float(v), Number::BigInt(w)) => BiggerInt::from(*v as u64).cmp(*w),
+			// ------------------------------
+			(Number::BigInt(v), Number::Decimal(w)) => {
+				v.cmp(BiggerInt::from(w.to_i128().unwrap_or_default()))
+			}
+			(Number::Decimal(v), Number::BigInt(w)) => {
+				v.to_i128().map(|v| BiggerInt::from(v).cmp(*w)).unwrap()
+			}
 		}
 	}
 }
@@ -439,6 +538,7 @@ impl hash::Hash for Number {
 			Number::Int(v) => v.hash(state),
 			Number::Float(v) => v.to_bits().hash(state),
 			Number::Decimal(v) => v.hash(state),
+			Number::BigInt(v) => v.hash(state),
 		}
 	}
 }
@@ -453,6 +553,7 @@ impl PartialEq for Number {
 			(Number::Int(v), Number::Int(w)) => v.eq(w),
 			(Number::Float(v), Number::Float(w)) => total_eq_f64(*v, *w),
 			(Number::Decimal(v), Number::Decimal(w)) => v.eq(w),
+			(Number::BigInt(v), Number::BigInt(w)) => v.eq(w),
 			// ------------------------------
 			(Number::Int(v), Number::Float(w)) => total_eq_f64(*v as f64, *w),
 			(Number::Float(v), Number::Int(w)) => total_eq_f64(*v, *w as f64),
@@ -462,6 +563,19 @@ impl PartialEq for Number {
 			// ------------------------------
 			(Number::Float(v), Number::Decimal(w)) => total_eq_f64(*v, w.to_f64().unwrap()),
 			(Number::Decimal(v), Number::Float(w)) => total_eq_f64(v.to_f64().unwrap(), *w),
+			// ------------------------------
+			(Number::BigInt(v), Number::Int(w)) => v.eq(&BiggerInt::from(*w)),
+			(Number::Int(v), Number::BigInt(w)) => BiggerInt::from(*v).eq(w),
+			// ------------------------------
+			(Number::BigInt(v), Number::Float(w)) => v.eq(&BiggerInt::from(*w as u64)),
+			(Number::Float(v), Number::BigInt(w)) => BiggerInt::from(*v as u64).eq(w),
+			// ------------------------------
+			(Number::BigInt(v), Number::Decimal(w)) => {
+				v.eq(&BiggerInt::from(w.to_i128().unwrap_or_default()))
+			}
+			(Number::Decimal(v), Number::BigInt(w)) => {
+				v.to_i128().map(|v| BiggerInt::from(v).eq(w)).unwrap()
+			}
 		}
 	}
 }
@@ -487,6 +601,13 @@ macro_rules! impl_simple_try_op {
 					),
 					(Number::Int(v), Number::Float(w)) => Number::Float((v as f64).$unchecked(w)),
 					(Number::Float(v), Number::Int(w)) => Number::Float(v.$unchecked(w as f64)),
+					(Number::BigInt(v), Number::BigInt(w)) => Number::BigInt(
+						v.$checked(w).ok_or_else(|| Error::$trt(v.to_string(), w.to_string()))?,
+					),
+					(Number::BigInt(v), w) => Number::BigInt(
+						v.$checked(w.to_bigint())
+							.ok_or_else(|| Error::$trt(v.to_string(), w.to_string()))?,
+					),
 					(v, w) => Number::Decimal(
 						v.to_decimal()
 							.$checked(w.to_decimal())
@@ -559,6 +680,7 @@ impl TryNeg for Number {
 			}
 			Self::Float(n) => Number::Float(-n),
 			Self::Decimal(n) => Number::Decimal(-n),
+			Self::BigInt(n) => Number::BigInt(n.neg()),
 		})
 	}
 }
@@ -572,6 +694,17 @@ impl ops::Add for Number {
 			(Number::Decimal(v), Number::Decimal(w)) => Number::Decimal(v + w),
 			(Number::Int(v), Number::Float(w)) => Number::Float(v as f64 + w),
 			(Number::Float(v), Number::Int(w)) => Number::Float(v + w as f64),
+			(Number::BigInt(v), Number::BigInt(w)) => Number::BigInt(v.add(w)),
+			(Number::BigInt(v), Number::Int(w)) => Number::BigInt(v.add(BiggerInt::from(w))),
+			(Number::Int(v), Number::BigInt(w)) => Number::BigInt(w.add(BiggerInt::from(v))),
+			(Number::BigInt(v), Number::Float(w)) => Number::BigInt(v.add(BiggerInt::from(w as u64))),
+			(Number::Float(v), Number::BigInt(w)) => Number::BigInt(w.add(BiggerInt::from(v as u64))),
+			(Number::BigInt(v), Number::Decimal(w)) => {
+				Number::BigInt(w.to_i128().map(|w| v.add(BiggerInt::from(w))).unwrap_or_default())
+			}
+			(Number::Decimal(v), Number::BigInt(w)) => {
+				Number::BigInt(v.to_i128().map(|v| w.add(BiggerInt::from(v))).unwrap_or_default())
+			}
 			(v, w) => Number::from(v.as_decimal() + w.as_decimal()),
 		}
 	}
@@ -586,6 +719,17 @@ impl<'a, 'b> ops::Add<&'b Number> for &'a Number {
 			(Number::Decimal(v), Number::Decimal(w)) => Number::Decimal(v + w),
 			(Number::Int(v), Number::Float(w)) => Number::Float(*v as f64 + w),
 			(Number::Float(v), Number::Int(w)) => Number::Float(v + *w as f64),
+			(Number::BigInt(v), Number::BigInt(w)) => Number::BigInt(v.add(w)),
+			(Number::BigInt(v), Number::Int(w)) => Number::BigInt(v.add(&BiggerInt::from(*w))),
+			(Number::Int(v), Number::BigInt(w)) => Number::BigInt(w.add(&BiggerInt::from(*v))),
+			(Number::BigInt(v), Number::Float(w)) => Number::BigInt(v.add(&BiggerInt::from(*w as u64))),
+			(Number::Float(v), Number::BigInt(w)) => Number::BigInt(w.add(&BiggerInt::from(*v as u64))),
+			(Number::BigInt(v), Number::Decimal(w)) => {
+				Number::BigInt(w.to_i128().map(|w| v.add(&BiggerInt::from(w))).unwrap())
+			}
+			(Number::Decimal(v), Number::BigInt(w)) => {
+				Number::BigInt(v.to_i128().map(|v| w.add(&BiggerInt::from(v))).unwrap())
+			}
 			(v, w) => Number::from(v.to_decimal() + w.to_decimal()),
 		}
 	}
@@ -600,6 +744,17 @@ impl ops::Sub for Number {
 			(Number::Decimal(v), Number::Decimal(w)) => Number::Decimal(v - w),
 			(Number::Int(v), Number::Float(w)) => Number::Float(v as f64 - w),
 			(Number::Float(v), Number::Int(w)) => Number::Float(v - w as f64),
+			(Number::BigInt(v), Number::BigInt(w)) => Number::BigInt(v.sub(w)),
+			(Number::BigInt(v), Number::Int(w)) => Number::BigInt(v.sub(BiggerInt::from(w))),
+			(Number::Int(v), Number::BigInt(w)) => Number::BigInt(BiggerInt::from(v).sub(w)),
+			(Number::BigInt(v), Number::Float(w)) => Number::BigInt(v.sub(BiggerInt::from(w as u64))),
+			(Number::Float(v), Number::BigInt(w)) => Number::BigInt(BiggerInt::from(v as u64).sub(w)),
+			(Number::BigInt(v), Number::Decimal(w)) => {
+				Number::BigInt(w.to_i128().map(|w| v.sub(BiggerInt::from(w))).unwrap_or_default())
+			}
+			(Number::Decimal(v), Number::BigInt(w)) => {
+				Number::BigInt(v.to_i128().map(|v| BiggerInt::from(v).sub(w)).unwrap_or_default())
+			}
 			(v, w) => Number::from(v.as_decimal() - w.as_decimal()),
 		}
 	}
@@ -614,6 +769,17 @@ impl<'a, 'b> ops::Sub<&'b Number> for &'a Number {
 			(Number::Decimal(v), Number::Decimal(w)) => Number::Decimal(v - w),
 			(Number::Int(v), Number::Float(w)) => Number::Float(*v as f64 - w),
 			(Number::Float(v), Number::Int(w)) => Number::Float(v - *w as f64),
+			(Number::BigInt(v), Number::BigInt(w)) => Number::BigInt(v.sub(w)),
+			(Number::BigInt(v), Number::Int(w)) => Number::BigInt(v.sub(&BiggerInt::from(*w))),
+			(Number::Int(v), Number::BigInt(w)) => Number::BigInt(BiggerInt::from(*v).sub(*w)),
+			(Number::BigInt(v), Number::Float(w)) => Number::BigInt(v.sub(&BiggerInt::from(*w as u64))),
+			(Number::Float(v), Number::BigInt(w)) => Number::BigInt(BiggerInt::from(*v as u64).sub(*w)),
+			(Number::BigInt(v), Number::Decimal(w)) => {
+				Number::BigInt(w.to_i128().map(|w| v.sub(&BiggerInt::from(w))).unwrap())
+			}
+			(Number::Decimal(v), Number::BigInt(w)) => {
+				Number::BigInt(v.to_i128().map(|v| BiggerInt::from(v).sub(*w)).unwrap())
+			}
 			(v, w) => Number::from(v.to_decimal() - w.to_decimal()),
 		}
 	}
@@ -628,6 +794,17 @@ impl ops::Mul for Number {
 			(Number::Decimal(v), Number::Decimal(w)) => Number::Decimal(v * w),
 			(Number::Int(v), Number::Float(w)) => Number::Float(v as f64 * w),
 			(Number::Float(v), Number::Int(w)) => Number::Float(v * w as f64),
+			(Number::BigInt(v), Number::BigInt(w)) => Number::BigInt(v.mul(w)),
+			(Number::BigInt(v), Number::Int(w)) => Number::BigInt(v.mul(BiggerInt::from(w))),
+			(Number::Int(v), Number::BigInt(w)) => Number::BigInt(w.mul(BiggerInt::from(v))),
+			(Number::BigInt(v), Number::Float(w)) => Number::BigInt(v.mul(BiggerInt::from(w as u64))),
+			(Number::Float(v), Number::BigInt(w)) => Number::BigInt(w.mul(BiggerInt::from(v as u64))),
+			(Number::BigInt(v), Number::Decimal(w)) => {
+				Number::BigInt(w.to_i128().map(|w| v.mul(BiggerInt::from(w))).unwrap_or_default())
+			}
+			(Number::Decimal(v), Number::BigInt(w)) => {
+				Number::BigInt(v.to_i128().map(|v| w.mul(BiggerInt::from(v))).unwrap_or_default())
+			}
 			(v, w) => Number::from(v.as_decimal() * w.as_decimal()),
 		}
 	}
@@ -642,6 +819,13 @@ impl<'a, 'b> ops::Mul<&'b Number> for &'a Number {
 			(Number::Decimal(v), Number::Decimal(w)) => Number::Decimal(v * w),
 			(Number::Int(v), Number::Float(w)) => Number::Float(*v as f64 * w),
 			(Number::Float(v), Number::Int(w)) => Number::Float(v * *w as f64),
+			(Number::BigInt(v), Number::BigInt(w)) => Number::BigInt(v.mul(w)),
+			(Number::BigInt(v), Number::Int(w)) => Number::BigInt(v.mul(&BiggerInt::from(*w))),
+			(Number::Int(v), Number::BigInt(w)) => Number::BigInt(BiggerInt::from(*v).mul(*w)),
+			// (Number::Big(v), Number::Float(w)) => Number::Big(v.mul(BiggerInt::from(*w as u64))),
+			// (Number::Float(v), Number::Big(w)) => Number::Big(w.mul(BiggerInt::from(*v as u64))),
+			// (Number::Big(v), Number::Decimal(w)) => Number::Big(w.to_i128().map(|w| v.mul(BiggerInt::from(w))).unwrap_or_default()),
+			// (Number::Decimal(v), Number::Big(w)) => Number::Big(v.to_i128().map(|v| w.mul(BiggerInt::from(v))).unwrap_or_default()),
 			(v, w) => Number::from(v.to_decimal() * w.to_decimal()),
 		}
 	}
@@ -656,6 +840,19 @@ impl ops::Div for Number {
 			(Number::Decimal(v), Number::Decimal(w)) => Number::Decimal(v / w),
 			(Number::Int(v), Number::Float(w)) => Number::Float(v as f64 / w),
 			(Number::Float(v), Number::Int(w)) => Number::Float(v / w as f64),
+			(Number::BigInt(v), Number::BigInt(w)) => Number::BigInt(v.div(w)),
+			(Number::BigInt(v), Number::Int(w)) => Number::BigInt(v.div(BiggerInt::from(w))),
+			(Number::Int(v), Number::BigInt(w)) => {
+				Number::BigInt(BiggerInt::from(v / w.to_i64().unwrap_or_default()))
+			}
+			// (Number::Big(v), Number::Float(w)) => Number::Big(v.div(BiggerInt::from(w as u64))),
+			// (Number::Float(v), Number::Big(w)) => Number::Big(w.div(BiggerInt::from(v as u64))),
+			// (Number::Big(v), Number::Decimal(w)) => {
+			// 	Number::Big(w.to_i128().map(|w| v.div(BiggerInt::from(w))).unwrap())
+			// }
+			// (Number::Decimal(v), Number::Big(w)) => {
+			// 	Number::Big(v.to_i128().map(|v| w.div(BiggerInt::from(v))).unwrap())
+			// }
 			(v, w) => Number::from(v.as_decimal() / w.as_decimal()),
 		}
 	}
@@ -670,6 +867,18 @@ impl<'a, 'b> ops::Div<&'b Number> for &'a Number {
 			(Number::Decimal(v), Number::Decimal(w)) => Number::Decimal(v / w),
 			(Number::Int(v), Number::Float(w)) => Number::Float(*v as f64 / w),
 			(Number::Float(v), Number::Int(w)) => Number::Float(v / *w as f64),
+			(Number::BigInt(v), Number::BigInt(w)) => Number::BigInt(v.div(w)),
+			(Number::BigInt(v), Number::Int(w)) => Number::BigInt(v.div(&BiggerInt::from(*w))),
+			(Number::Int(v), Number::BigInt(w)) => Number::BigInt(BiggerInt::from(*v).div(*w)),
+
+			// (Number::Big(v), Number::Float(w)) => Number::Big(v.div(BiggerInt::from(*w as u64))),
+			// (Number::Float(v), Number::Big(w)) => Number::Big(w.div(BiggerInt::from(*v as u64))),
+			// (Number::Big(v), Number::Decimal(w)) => {
+			// 	Number::Big(w.to_i128().map(|w| v.div(BiggerInt::from(w))).unwrap_or_default())
+			// }
+			// (Number::Decimal(v), Number::Big(w)) => {
+			// 	Number::Big(v.to_i128().map(|v| w.div(BiggerInt::from(v))).unwrap_or_default())
+			// }
 			(v, w) => Number::from(v.to_decimal() / w.to_decimal()),
 		}
 	}
@@ -683,6 +892,7 @@ impl Neg for Number {
 			Self::Int(n) => Number::Int(-n),
 			Self::Float(n) => Number::Float(-n),
 			Self::Decimal(n) => Number::Decimal(-n),
+			Self::BigInt(n) => Number::BigInt(-n),
 		}
 	}
 }

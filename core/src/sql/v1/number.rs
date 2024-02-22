@@ -1,4 +1,4 @@
-pub use super::value::serde::BiggerInt;
+pub use super::value::BiggerInt;
 use super::value::{TryAdd, TryDiv, TryMul, TryNeg, TryPow, TryRem, TrySub};
 use crate::err::Error;
 use crate::sql::strand::Strand;

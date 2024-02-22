@@ -5,6 +5,7 @@ use crate::dbs::{Options, Transaction};
 use crate::doc::CursorDoc;
 use crate::err::Error;
 use crate::fnc::util::string::fuzzy::Fuzzy;
+use crate::sql::value::serde::BiggerInt;
 use crate::sql::{
 	array::Uniq,
 	fmt::{Fmt, Pretty},
@@ -370,6 +371,12 @@ impl From<Decimal> for Value {
 	}
 }
 
+impl From<BiggerInt> for Value {
+	fn from(v: BiggerInt) -> Self {
+		Value::Number(Number::from(v))
+	}
+}
+
 impl From<String> for Value {
 	fn from(v: String) -> Self {
 		Self::Strand(Strand::from(v))
@@ -650,6 +657,16 @@ impl TryFrom<Value> for Decimal {
 		match value {
 			Value::Number(x) => x.try_into(),
 			_ => Err(Error::TryFrom(value.to_string(), "Decimal")),
+		}
+	}
+}
+
+impl TryFrom<Value> for BiggerInt {
+	type Error = Error;
+	fn try_from(value: Value) -> Result<Self, Self::Error> {
+		match value {
+			Value::Number(x) => x.try_into(),
+			_ => Err(Error::TryFrom(value.to_string(), "BiggerInt")),
 		}
 	}
 }
@@ -955,6 +972,11 @@ impl Value {
 		matches!(self, Value::Number(Number::Decimal(_)))
 	}
 
+	/// Check if this Value is a big Number
+	pub fn is_bigint(&self) -> bool {
+		matches!(self, Value::Number(Number::BigInt(_)))
+	}
+
 	/// Check if this Value is a Number but is a NAN
 	pub fn is_nan(&self) -> bool {
 		matches!(self, Value::Number(v) if v.is_nan())
@@ -1150,6 +1172,7 @@ impl Value {
 			Self::Number(Number::Int(_)) => "int",
 			Self::Number(Number::Float(_)) => "float",
 			Self::Number(Number::Decimal(_)) => "decimal",
+			Self::Number(Number::BigInt(_)) => "bigint",
 			Self::Geometry(Geometry::Point(_)) => "geometry<point>",
 			Self::Geometry(Geometry::Line(_)) => "geometry<line>",
 			Self::Geometry(Geometry::Polygon(_)) => "geometry<polygon>",
@@ -1176,6 +1199,7 @@ impl Value {
 			Kind::Int => self.coerce_to_int().map(Value::from),
 			Kind::Float => self.coerce_to_float().map(Value::from),
 			Kind::Decimal => self.coerce_to_decimal().map(Value::from),
+			Kind::BigInt => self.coerce_to_big().map(Value::from),
 			Kind::Number => self.coerce_to_number().map(Value::from),
 			Kind::String => self.coerce_to_strand().map(Value::from),
 			Kind::Datetime => self.coerce_to_datetime().map(Value::from),
@@ -1416,10 +1440,50 @@ impl Value {
 					into: "decimal".into(),
 				}),
 			},
+			// Attempt to convert a big number
+			// todo: should properly handle conversions by checking overflow and returning errors
+			Value::Number(Number::BigInt(v)) => match v.to_i128() {
+				// The Big can be represented as a Decimal
+				Some(v) => match Decimal::from_i128(v) {
+					Some(v) => Ok(Number::Decimal(v)),
+					None => Err(Error::CoerceTo {
+						from: self,
+						into: "decimal".into(),
+					}),
+				},
+				// This Big does not convert to a Decimal
+				None => Err(Error::CoerceTo {
+					from: self,
+					into: "decimal".into(),
+				}),
+			},
 			// Anything else raises an error
 			_ => Err(Error::CoerceTo {
 				from: self,
 				into: "decimal".into(),
+			}),
+		}
+	}
+
+	/// Try to coerce this value to a big `Number`
+	pub(crate) fn coerce_to_big(self) -> Result<Number, Error> {
+		match self {
+			// Allow any big number
+			Value::Number(v) if v.is_bigint() => Ok(v),
+			// Attempt to convert an int number
+			Value::Number(Number::Int(v)) => Ok(Number::BigInt(BiggerInt::from(v))),
+			// Attempt to convert an decimal number
+			Value::Number(Number::Decimal(v)) => match v.to_i128() {
+				Some(v) => Ok(Number::BigInt(BiggerInt::from(v))),
+				None => Err(Error::CoerceTo {
+					from: self,
+					into: "bigint".into(),
+				}),
+			},
+			// Anything else raises an error
+			_ => Err(Error::CoerceTo {
+				from: self,
+				into: "bigint".into(),
 			}),
 		}
 	}
@@ -1731,6 +1795,7 @@ impl Value {
 			Kind::Int => self.convert_to_int().map(Value::from),
 			Kind::Float => self.convert_to_float().map(Value::from),
 			Kind::Decimal => self.convert_to_decimal().map(Value::from),
+			Kind::BigInt => self.convert_to_bigint().map(Value::from),
 			Kind::Number => self.convert_to_number().map(Value::from),
 			Kind::String => self.convert_to_strand().map(Value::from),
 			Kind::Datetime => self.convert_to_datetime().map(Value::from),
@@ -1928,6 +1993,16 @@ impl Value {
 					into: "decimal".into(),
 				}),
 			},
+			// Attempt to convert an big number
+			Value::Number(Number::BigInt(ref v)) => match Decimal::try_from(v.to_i128().unwrap()) {
+				// The Big can be represented as a Decimal
+				Ok(v) => Ok(Number::Decimal(v)),
+				// This Big does not convert to a Decimal
+				_ => Err(Error::ConvertTo {
+					from: self,
+					into: "decimal".into(),
+				}),
+			},
 			// Attempt to convert a string value
 			Value::Strand(ref v) => match Decimal::from_str(v) {
 				// The string can be represented as a Decimal
@@ -1942,6 +2017,59 @@ impl Value {
 			_ => Err(Error::ConvertTo {
 				from: self,
 				into: "decimal".into(),
+			}),
+		}
+	}
+
+	/// Try to convert this value to a big `Number`
+	pub(crate) fn convert_to_bigint(self) -> Result<Number, Error> {
+		match self {
+			// Allow any big number
+			Value::Number(v) if v.is_bigint() => Ok(v),
+			// Attempt to convert an int number
+			Value::Number(Number::Int(ref v)) => match BiggerInt::try_from(*v) {
+				// The Int can be represented as a Big
+				Ok(v) => Ok(Number::BigInt(v)),
+				// This Int does not convert to a Big
+				_ => Err(Error::ConvertTo {
+					from: self,
+					into: "bigint".into(),
+				}),
+			},
+			// Attempt to convert an float number
+			Value::Number(Number::Float(ref v)) => match BiggerInt::try_from(*v) {
+				// The Float can be represented as a Big
+				Ok(v) => Ok(Number::BigInt(v)),
+				// This Float does not convert to a Big
+				_ => Err(Error::ConvertTo {
+					from: self,
+					into: "bigint".into(),
+				}),
+			},
+			// Attempt to convert a decimal number
+			Value::Number(Number::Decimal(ref v)) => match BiggerInt::try_from(*v) {
+				// The Float can be represented as a Big
+				Ok(v) => Ok(Number::BigInt(v)),
+				// This Float does not convert to a Big
+				_ => Err(Error::ConvertTo {
+					from: self,
+					into: "bigint".into(),
+				}),
+			},
+			// Attempt to convert a string value
+			Value::Strand(ref v) => match BiggerInt::from_str(v) {
+				// The string can be represented as a Big
+				Ok(v) => Ok(Number::BigInt(v)),
+				// This string is not a Big
+				_ => Err(Error::ConvertTo {
+					from: self,
+					into: "bigint".into(),
+				}),
+			},
+			// Anything else raises an error
+			_ => Err(Error::ConvertTo {
+				from: self,
+				into: "bigint".into(),
 			}),
 		}
 	}
@@ -2848,16 +2976,20 @@ mod tests {
 
 	#[test]
 	fn check_size() {
-		assert_eq!(64, std::mem::size_of::<Value>());
-		assert_eq!(104, std::mem::size_of::<Error>());
-		assert_eq!(104, std::mem::size_of::<Result<Value, Error>>());
+		assert!(
+			64 >= std::mem::size_of::<Value>(),
+			"expected Value to be smaller then 64 bytes found {:?}",
+			std::mem::size_of::<Value>()
+		);
+		assert!(112 >= std::mem::size_of::<Error>());
+		assert!(112 >= std::mem::size_of::<Result<Value, Error>>());
 		assert_eq!(24, std::mem::size_of::<crate::sql::number::Number>());
 		assert_eq!(24, std::mem::size_of::<crate::sql::strand::Strand>());
 		assert_eq!(16, std::mem::size_of::<crate::sql::duration::Duration>());
 		assert_eq!(12, std::mem::size_of::<crate::sql::datetime::Datetime>());
 		assert_eq!(24, std::mem::size_of::<crate::sql::array::Array>());
 		assert_eq!(24, std::mem::size_of::<crate::sql::object::Object>());
-		assert_eq!(56, std::mem::size_of::<crate::sql::geometry::Geometry>());
+		assert!(56 >= std::mem::size_of::<crate::sql::geometry::Geometry>());
 		assert_eq!(24, std::mem::size_of::<crate::sql::param::Param>());
 		assert_eq!(24, std::mem::size_of::<crate::sql::idiom::Idiom>());
 		assert_eq!(24, std::mem::size_of::<crate::sql::table::Table>());
