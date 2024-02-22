@@ -69,6 +69,7 @@ use serde::ser::SerializeTupleStruct;
 use serde::ser::SerializeTupleVariant;
 use std::fmt::Display;
 
+pub use big::BiggerInt;
 pub use value::to_value;
 
 trait Serializer: Sized {

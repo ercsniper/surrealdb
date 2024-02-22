@@ -2,6 +2,8 @@ pub use self::value::*;
 
 pub(super) mod serde;
 
+pub use self::serde::BiggerInt;
+
 #[allow(clippy::module_inception)]
 mod value;
 

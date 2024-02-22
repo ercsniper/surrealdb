@@ -141,6 +141,7 @@ pub use self::value::serde::to_value;
 pub use self::value::serde::{from_value, FromValueError};
 pub use self::value::Value;
 pub use self::value::Values;
+pub use self::value::BiggerInt;
 pub use self::version::Version;
 pub use self::view::View;
 pub use self::with::With;
