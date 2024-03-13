@@ -372,6 +372,11 @@ pub struct TiKv;
 #[derive(Debug)]
 pub struct FDb;
 
+#[cfg(feature = "kv-surrealkv")]
+#[cfg_attr(docsrs, doc(cfg(feature = "kv-surrealkv")))]
+#[derive(Debug)]
+pub struct SurrealKV;
+
 /// An embedded database
 #[derive(Debug, Clone)]
 pub struct Db {
@@ -387,6 +392,7 @@ impl Surreal<Db> {
 			address: address.into_endpoint(),
 			capacity: 0,
 			client: PhantomData,
+			waiter: self.waiter.clone(),
 			response_type: PhantomData,
 		}
 	}

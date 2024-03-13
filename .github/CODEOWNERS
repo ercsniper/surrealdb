@@ -8,6 +8,7 @@
 .dockerignore @surrealdb/ci
 build.rs @surrealdb/ci
 *.nix @surrealdb/ci
+flake.lock @surrealdb/ci
 /.cargo/ @surrealdb/ci
 /.config/ @surrealdb/ci
 /dev/ @surrealdb/ci
@@ -28,6 +29,7 @@ supply-chain/* @surrealdb/security
 /doc/ @surrealdb/db
 /lib/ @surrealdb/db
 /src/ @surrealdb/db
+/tests/ @surrealdb/db
 
 # Code for fuzzing configuration
 /lib/fuzz/ @surrealdb/security

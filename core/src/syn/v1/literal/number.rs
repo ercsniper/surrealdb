@@ -50,14 +50,21 @@ fn not_nan(i: &str) -> IResult<&str, Number> {
 				.map_err(Err::Failure)?;
 			Number::from(float)
 		}
-		Suffix::Decimal => Number::from(
+		Suffix::Decimal => Number::from(if v.contains(['e', 'E']) {
+			Decimal::from_scientific(v)
+				.map_err(|e| ParseError::ParseDecimal {
+					tried: v,
+					error: e,
+				})
+				.map_err(Err::Failure)?
+		} else {
 			Decimal::from_str(v)
 				.map_err(|e| ParseError::ParseDecimal {
 					tried: v,
 					error: e,
 				})
-				.map_err(Err::Failure)?,
-		),
+				.map_err(Err::Failure)?
+		}),
 		Suffix::BigInt => Number::from(
 			BiggerInt::from_str(v)
 				.map_err(|e| ParseError::ParseBiggerInt {
@@ -99,6 +106,8 @@ pub fn integer(i: &str) -> IResult<&str, i64> {
 
 #[cfg(test)]
 mod tests {
+
+	use rust_decimal::prelude::FromPrimitive;
 
 	use super::*;
 	use std::{cmp::Ordering, ops::Div};
@@ -197,6 +206,15 @@ mod tests {
 		let res = number(sql);
 		let out = res.unwrap().1;
 		assert_eq!(sql, format!("{}", out));
+	}
+
+	#[test]
+	fn number_scientific_upper_decimal() {
+		let sql = "12345E-02dec";
+		let res = number(sql);
+		let out = res.unwrap().1;
+		assert_eq!("123.45dec", format!("{}", out));
+		assert_eq!(out, Number::Decimal(rust_decimal::Decimal::from_f64(123.45).unwrap()));
 	}
 
 	#[test]

@@ -121,7 +121,9 @@ fn parse_define_namespace() {
 		Statement::Define(DefineStatement::Namespace(DefineNamespaceStatement {
 			id: None,
 			name: Ident("a".to_string()),
-			comment: Some(Strand("test".to_string()))
+			comment: Some(Strand("test".to_string())),
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	);
 
@@ -131,7 +133,9 @@ fn parse_define_namespace() {
 		Statement::Define(DefineStatement::Namespace(DefineNamespaceStatement {
 			id: None,
 			name: Ident("a".to_string()),
-			comment: None
+			comment: None,
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	)
 }
@@ -146,8 +150,10 @@ fn parse_define_database() {
 			name: Ident("a".to_string()),
 			comment: Some(Strand("test".to_string())),
 			changefeed: Some(ChangeFeed {
-				expiry: std::time::Duration::from_secs(60) * 10
-			})
+				expiry: std::time::Duration::from_secs(60) * 10,
+			}),
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	);
 
@@ -158,7 +164,9 @@ fn parse_define_database() {
 			id: None,
 			name: Ident("a".to_string()),
 			comment: None,
-			changefeed: None
+			changefeed: None,
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	)
 }
@@ -188,6 +196,8 @@ fn parse_define_function() {
 			})]),
 			comment: Some(Strand("test".to_string())),
 			permissions: Permission::Full,
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	)
 }
@@ -225,7 +235,9 @@ fn parse_define_token() {
 			base: Base::Sc(Ident("b".to_string())),
 			kind: Algorithm::EdDSA,
 			code: "foo".to_string(),
-			comment: Some(Strand("bar".to_string()))
+			comment: Some(Strand("bar".to_string())),
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	)
 }
@@ -269,7 +281,9 @@ fn parse_define_param() {
 				.collect()
 			)),
 			comment: None,
-			permissions: Permission::Specific(Value::Null)
+			permissions: Permission::Specific(Value::Null),
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	);
 }
@@ -315,6 +329,8 @@ fn parse_define_table() {
 				expiry: std::time::Duration::from_secs(1)
 			}),
 			comment: None,
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	);
 }
@@ -333,6 +349,8 @@ fn parse_define_event() {
 			when: Value::Null,
 			then: Values(vec![Value::Null, Value::None]),
 			comment: None,
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	)
 }
@@ -370,7 +388,9 @@ fn parse_define_field() {
 				create: Permission::Specific(Value::Bool(true)),
 				select: Permission::Full,
 			},
-			comment: None
+			comment: None,
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	)
 }
@@ -417,7 +437,9 @@ fn parse_define_index() {
 				postings_cache: 7,
 				terms_cache: 8,
 			}),
-			comment: None
+			comment: None,
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	);
 
@@ -431,7 +453,9 @@ fn parse_define_index() {
 			what: Ident("table".to_owned()),
 			cols: Idioms(vec![Idiom(vec![Part::Field(Ident("a".to_owned()))]),]),
 			index: Index::Uniq,
-			comment: None
+			comment: None,
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	);
 
@@ -446,6 +470,7 @@ fn parse_define_index() {
 			cols: Idioms(vec![Idiom(vec![Part::Field(Ident("a".to_owned()))]),]),
 			index: Index::MTree(MTreeParams {
 				dimension: 4,
+				_distance: Default::default(),
 				distance: Distance::Minkowski(Number::Int(5)),
 				capacity: 6,
 				doc_ids_order: 7,
@@ -453,7 +478,9 @@ fn parse_define_index() {
 				mtree_cache: 9,
 				vector_type: VectorType::F64,
 			}),
-			comment: None
+			comment: None,
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		}))
 	);
 }
@@ -486,6 +513,8 @@ fn parse_define_analyzer() {
 			comment: None,
 			#[cfg(feature = "sql2")]
 			function: Some(Ident("foo::bar".to_string())),
+			#[cfg(feature = "sql2")]
+			if_not_exists: false,
 		})),
 	)
 }
@@ -1052,7 +1081,9 @@ fn parse_remove() {
 	assert_eq!(
 		res,
 		Statement::Remove(RemoveStatement::Namespace(RemoveNamespaceStatement {
-			name: Ident("ns".to_owned())
+			name: Ident("ns".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1060,7 +1091,9 @@ fn parse_remove() {
 	assert_eq!(
 		res,
 		Statement::Remove(RemoveStatement::Database(RemoveDatabaseStatement {
-			name: Ident("database".to_owned())
+			name: Ident("database".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1068,14 +1101,18 @@ fn parse_remove() {
 	assert_eq!(
 		res,
 		Statement::Remove(RemoveStatement::Function(RemoveFunctionStatement {
-			name: Ident("foo::bar".to_owned())
+			name: Ident("foo::bar".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 	let res = test_parse!(parse_stmt, r#"REMOVE FUNCTION fn::foo::bar();"#).unwrap();
 	assert_eq!(
 		res,
 		Statement::Remove(RemoveStatement::Function(RemoveFunctionStatement {
-			name: Ident("foo::bar".to_owned())
+			name: Ident("foo::bar".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1084,7 +1121,9 @@ fn parse_remove() {
 		res,
 		Statement::Remove(RemoveStatement::Token(RemoveTokenStatement {
 			name: Ident("foo".to_owned()),
-			base: Base::Sc(Ident("bar".to_owned()))
+			base: Base::Sc(Ident("bar".to_owned())),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1093,6 +1132,8 @@ fn parse_remove() {
 		res,
 		Statement::Remove(RemoveStatement::Scope(RemoveScopeStatement {
 			name: Ident("foo".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1101,6 +1142,8 @@ fn parse_remove() {
 		res,
 		Statement::Remove(RemoveStatement::Param(RemoveParamStatement {
 			name: Ident("foo".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1120,6 +1163,8 @@ fn parse_remove() {
 		Statement::Remove(RemoveStatement::Event(RemoveEventStatement {
 			name: Ident("foo".to_owned()),
 			what: Ident("bar".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1133,6 +1178,8 @@ fn parse_remove() {
 				Part::Index(Number::Int(10))
 			]),
 			what: Ident("bar".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1142,6 +1189,8 @@ fn parse_remove() {
 		Statement::Remove(RemoveStatement::Index(RemoveIndexStatement {
 			name: Ident("foo".to_owned()),
 			what: Ident("bar".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1150,6 +1199,8 @@ fn parse_remove() {
 		res,
 		Statement::Remove(RemoveStatement::Analyzer(RemoveAnalyzerStatement {
 			name: Ident("foo".to_owned()),
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 
@@ -1159,6 +1210,8 @@ fn parse_remove() {
 		Statement::Remove(RemoveStatement::User(RemoveUserStatement {
 			name: Ident("foo".to_owned()),
 			base: Base::Db,
+			#[cfg(feature = "sql2")]
+			if_exists: false,
 		}))
 	);
 }
